@@ -1,0 +1,100 @@
+# Default configuration for the full study.
+# Paths are relative to the project root unless absolute.
+
+paths:
+  sheepdog_data: ../SheepDog-main/data       # folder with news_articles/, reframings/, adversarial_test/
+  adsent_data: ../AdSent-main/data           # optional: folder with reformed/ (Llama-3.1 sentiment sets)
+  processed: data/processed                  # canonical JSONL written by scripts/01_prepare_data.py
+  checkpoints: checkpoints
+  results: results
+  nrc_lexicon: lexicons/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt
+
+datasets: [politifact, gossipcop, lun]
+
+# Attack families. Each family lists the attack sets (files under processed/<dataset>/attacks/).
+families:
+  publisher: [publisher_A, publisher_B, publisher_C, publisher_D]
+  sentiment: [sentiment_adv]                 # Gemma-2 pairing: fake -> positive, real -> negative
+controls:
+  sentiment: [sentiment_ctl]                 # opposite pairing, used as the non-adversarial control
+
+subset:
+  size: 500            # Stages 3-4 run on a class-stratified subset per dataset (PolitiFact keeps all 90)
+  seed: 0
+
+encoders:
+  models:
+    bert: bert-base-uncased
+    roberta: roberta-base
+    gpt2: gpt2
+  strategies: [A, B, C]
+  seeds: [0, 1, 2]
+  train:
+    lr: 2.0e-5
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    grad_clip: 1.0
+    epochs: 5
+    batch_size: 16
+    grad_accum: 1
+    max_len: 256
+    consistency_lambda: 1.0   # strategy C
+  # every stage (scores, states, attribution, erasure, patching) uses max_len, so all stages see the same input
+
+llms:
+  models:
+    llama3: meta-llama/Meta-Llama-3-8B-Instruct
+    qwen25: Qwen/Qwen2.5-7B-Instruct
+    mistral: mistralai/Mistral-7B-Instruct-v0.3
+  max_article_tokens: 1536
+  batch_size: 4
+  dtype: bfloat16
+  mapping_seed: 0             # Real/Fake -> A/B mapping is a hash of (seed, article id)
+  layers: every_2             # hidden-state layers to store: all | every_2 | list of ints
+
+generation:
+  model: google/gemma-2-9b-it
+  max_words: 1200
+  max_tokens: 2048
+  seed: 0
+
+validity:
+  nli_model: MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli
+  nli_threshold: 0.5          # mean entailment over chunks, required in both directions
+  anchor_threshold: 0.8       # share of numbers, dates and named entities kept
+  chunk_words: 200
+  audit_per_family: 100
+
+behaviour:
+  ece_bins: 10
+  bootstrap: 1000
+
+representation:
+  probe_C: 1.0
+  min_clean_acc: 0.55         # probe retention is undefined below this
+  random_edit_seed: 0
+
+attribution:
+  ig_steps: 32
+  ig_internal_batch: 8
+  llm_ig_internal_batch: 1   # 7B models: one interpolation step per backward pass
+  llm_ig_steps: 32           # more steps did not reduce IG's completeness error for LLMs in our test (32 -> 128
+                             # made it worse on Qwen2.5-0.5B); use ig_rel_delta to filter instead
+  occlusion_batch: 32
+  llm_occlusion_batch: 4
+  second_explainer: occlusion # occlusion (no extra dependency) or shap
+  shap_evals: 256
+  topk: 10
+
+causal:
+  erase_layer: two_thirds     # two_thirds | <int> | auto (= Stage 2 divergence depth; on the full run almost
+                              # always the first layer, so not recommended)
+  patch_layers: all
+
+diagnosis:
+  s_cut: 0.9
+  g_cut: 0.05
+  pr_cut: 0.5
+
+analysis:
+  permutations: 10000

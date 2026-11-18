@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robustlens"
+version = "0.1.0"
+description = "Interpretability-grounded robustness diagnosis for fake-news detectors under LLM attacks"
+requires-python = ">=3.8"
+dependencies = [
+  "torch>=2.2", "transformers>=4.46", "tokenizers>=0.20", "sentencepiece>=0.2", "numpy>=1.24", "scipy>=1.10",
+  "pandas>=2.0", "scikit-learn>=1.3", "matplotlib>=3.7", "pyyaml>=6.0", "captum>=0.7", "concept-erasure>=0.2; python_version >= '3.10'",
+]
+
+[project.optional-dependencies]
+generation = ["vllm>=0.6.3; python_version >= '3.9'", "vllm==0.6.3.post1; python_version < '3.9'"]
+shap = ["shap>=0.45"]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools]
+packages = ["robustlens", "robustlens.detectors", "robustlens.stages", "robustlens.attacks", "robustlens.analysis"]

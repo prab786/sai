@@ -1,0 +1,90 @@
+# Smoke test: whole pipeline on PolitiFact with tiny models (CPU). Paths as in configs/default.yaml.
+paths:
+  sheepdog_data: ../SheepDog-main/data
+  adsent_data: ../AdSent-main/data
+  processed: smoke/processed
+  checkpoints: smoke/checkpoints
+  results: smoke/results
+  nrc_lexicon: lexicons/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt
+datasets:
+- politifact
+families:
+  publisher:
+  - publisher_A
+  - publisher_B
+  - publisher_C
+  - publisher_D
+  sentiment:
+  - sentiment_adsent_adv
+controls:
+  sentiment:
+  - sentiment_adsent_ctl
+subset:
+  size: 500
+  seed: 0
+encoders:
+  models:
+    bert: google/bert_uncased_L-2_H-128_A-2
+    roberta: hf-internal-testing/tiny-random-roberta
+    gpt2: sshleifer/tiny-gpt2
+  strategies:
+  - A
+  - B
+  - C
+  seeds:
+  - 0
+  - 1
+  train:
+    lr: 0.0001
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    grad_clip: 1.0
+    epochs: 2
+    batch_size: 8
+    grad_accum: 1
+    max_len: 128
+    consistency_lambda: 1.0
+llms:
+  models:
+    qwen25: Qwen/Qwen2.5-0.5B-Instruct
+  max_article_tokens: 96
+  batch_size: 4
+  dtype: float32
+  mapping_seed: 0
+  layers: every_2
+generation:
+  model: google/gemma-2-9b-it
+  max_words: 1200
+  max_tokens: 2048
+  seed: 0
+validity:
+  nli_model: MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli
+  nli_threshold: 0.5
+  anchor_threshold: 0.8
+  chunk_words: 200
+  audit_per_family: 100
+behaviour:
+  ece_bins: 10
+  bootstrap: 200
+representation:
+  probe_C: 1.0
+  min_clean_acc: 0.55
+  random_edit_seed: 0
+attribution:
+  ig_steps: 8
+  ig_internal_batch: 8
+  llm_ig_internal_batch: 1
+  occlusion_batch: 32
+  llm_occlusion_batch: 4
+  second_explainer: occlusion
+  shap_evals: 256
+  topk: 10
+causal:
+  erase_layer: auto
+  patch_layers: all
+diagnosis:
+  s_cut: 0.9
+  g_cut: 0.05
+  pr_cut: 0.5
+analysis:
+  permutations: 200
