@@ -70,7 +70,7 @@ for y, name in [(0, "real"), (1, "fake")]:
 enc = pub[~pub.llm]
 print("Encoder macro-F1 drop on sets A-D by strategy (A=FT, B=+rewrites, C=+consistency):",
       {k: round(v, 3) for k, v in enc.groupby("strategy").f1_drop.mean().items()})
-sh = [v["control_shuffled_acc"] for f in glob.glob(os.path.join(R, "stage2", "*", "*", "*.json"))
+sh = [v["control_shuffled_acc"] for f in glob.glob(os.path.join(R, "stage2", "*", "*", "publisher_*.json"))
       for k, v in json.load(open(f))["layers"].items()
       if k == str(json.load(open(f))["final_layer"]) and v.get("control_shuffled_acc") is not None]
 print(f"Shuffled-label probe accuracy (last layer): mean {np.mean(sh):.3f}")
@@ -265,6 +265,11 @@ for ds in DATASETS:
     er_p += [sm_[f"publisher_{s}"]["edit_ratio_median"] for s in "ABCD"]
 print(f"Tone rewrites: NLI pass {rng_(100*min(tn),100*max(tn),0)}%; anchors kept (median) {rng_(100*min(ta),100*max(ta),0)}%")
 print(f"Share of words changed (median): tone {rng_(100*min(er_t),100*max(er_t),0)}%, style {rng_(100*min(er_p),100*max(er_p),0)}%")
+for gate in ("nli", "full"):
+    res = {(ds, det): gated(ds, "sentiment_adv", det, gate)
+           for ds in DATASETS for det in sorted(os.listdir(os.path.join(R, "predictions", ds)))}
+    res = {k: v for k, v in res.items() if v is not None}
+    print(f"Tone attack under the {gate.upper()} check: reversed {sum(1 for v in res.values() if v[1] < 0.5)} of {len(res)}")
 for atk in ("sentiment_adv", "sentiment_ctl"):
     x = df[df.attack == atk]
     print(f"{atk}: " + ", ".join(f"{g} {x[x.group==g].clean_auroc.mean():.2f}->{x[x.group==g].adv_auroc.mean():.2f}"

@@ -1,7 +1,6 @@
 """Data layer.
 
-Reads the SheepDog (Wu et al., 2024) and AdSent (Tahmasebi et al., 2026) releases, which are
-pickled dicts of lists, and writes one canonical JSONL format:
+Reads the SheepDog (Wu et al., 2024) release, which is pickled dicts of lists, and writes one canonical JSONL format:
 
     processed/<dataset>/train.jsonl, test.jsonl          {"id", "text", "label"}   label 0 = real, 1 = fake
     processed/<dataset>/reframings/<style>.jsonl          aligned with train ids
@@ -26,7 +25,6 @@ REAL, FAKE = 0, 1
 RELIABLE_STYLES = ("objective", "neutral")
 UNRELIABLE_STYLES = ("emotionally_triggering", "sensational")
 PUBLISHER_SETS = ("A", "B", "C", "D")
-ADSENT_TONES = {"pos": "positive", "neg": "negative", "neutral": "neutral"}
 
 
 # --------------------------------------------------------------------------- safe unpickling
@@ -84,8 +82,7 @@ def _split_from_rows(rows: list[dict], name: str) -> Split:
 
 
 # --------------------------------------------------------------------------- preparation
-def prepare(sheepdog_dir: str | Path, out_dir: str | Path, adsent_dir: str | Path | None = None,
-            datasets=DATASETS) -> dict:
+def prepare(sheepdog_dir: str | Path, out_dir: str | Path, datasets=DATASETS) -> dict:
     """Convert the pickled releases to canonical JSONL. Returns a manifest of what was written."""
     sd, out = Path(sheepdog_dir), ensure_dir(out_dir)
     manifest: dict = {}
@@ -117,18 +114,6 @@ def prepare(sheepdog_dir: str | Path, out_dir: str | Path, adsent_dir: str | Pat
                 _write_attack(safe_load_pickle(p), splits["test"], dsdir / "attacks" / f"publisher_{s}.jsonl", p)
                 entry.setdefault("attacks", []).append(f"publisher_{s}")
 
-        if adsent_dir is not None:
-            for tag in ADSENT_TONES:
-                p = Path(adsent_dir) / "reformed" / f"{ds}_test_sen_llama_{tag}.pkl"
-                if p.exists():
-                    _write_attack(safe_load_pickle(p), splits["test"], dsdir / "attacks" / f"adsent_{tag}.jsonl", p)
-                    entry.setdefault("attacks", []).append(f"adsent_{tag}")
-            pos, neg = dsdir / "attacks" / "adsent_pos.jsonl", dsdir / "attacks" / "adsent_neg.jsonl"
-            if pos.exists() and neg.exists():
-                for adversarial, name in ((True, "sentiment_adsent_adv"), (False, "sentiment_adsent_ctl")):
-                    paired = pair_sentiment(_split_from_rows(read_jsonl(pos), "pos"), _split_from_rows(read_jsonl(neg), "neg"), adversarial)
-                    write_jsonl(paired.rows(), dsdir / "attacks" / f"{name}.jsonl")
-                    entry["attacks"].append(name)
         manifest[ds] = entry
         log.info("prepared %s: %s", ds, {k: v for k, v in entry.items() if k in ("train", "test")})
     save_json(manifest, out / "manifest.json")

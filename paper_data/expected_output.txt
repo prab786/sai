@@ -73,6 +73,8 @@ FULL check, LLM A/B cases reversed: 6 of 12 {'politifact': '0/0', 'gossipcop': '
 Style rewrites passing NLI: 74-87%; strict check: 14-26%
 Tone rewrites: NLI pass 76-80%; anchors kept (median) 90-95%
 Share of words changed (median): tone 21-33%, style 66-78%
+Tone attack under the NLI check: reversed 0 of 90
+Tone attack under the FULL check: reversed 0 of 90
 sentiment_adv: FT 0.90->0.85, FT+Aug 0.91->0.89, LLMs 0.77->0.62; reversed 0 of 90; lowest AUROC 0.51
 sentiment_ctl: FT 0.90->0.91, FT+Aug 0.91->0.92, LLMs 0.77->0.78; reversed 0 of 90; lowest AUROC 0.68
 

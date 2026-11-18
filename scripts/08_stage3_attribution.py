@@ -1,13 +1,11 @@
 """Stage 3 on the fixed subset: IG (+ occlusion or SHAP), stability, cue reliance.
 
-Per article (clean):    NRC sentiment reliance, agreement between the two explainers, IG completeness error.
+Per article (clean):    agreement between the two explainers, IG completeness error.
 Per article x attack:   attribution stability clean vs attacked, the same for the matched random edit
                         (control), style reliance on words the rewrite changed, and whether the label flipped.
 Writes results/stage3/<ds>/<detector>/{clean.jsonl, <attack>.jsonl, summary.json} and the word attributions
-themselves in attributions/<set>.jsonl.gz, so new measures can be computed later with
-scripts/08b_rescore_attributions.py without running IG again.
+themselves in attributions/<set>.jsonl.gz, so new measures can be computed later without running IG again.
 
-The NRC lexicon is required (sentiment reliance is an RQ1 predictor and half of RQ3); --allow-no-nrc skips it.
 --resume keeps finished sets: it reloads the clean attributions and skips attack sets whose output exists.
 IG completeness: ``ig_rel_delta`` = |sum of attributions - (f(x) - f(baseline))| / max(|f(x) - f(baseline)|, 1 logit).
 """
@@ -35,22 +33,11 @@ ap.add_argument("--detector", required=True)
 ap.add_argument("--sets", nargs="*", help="attack sets (default: every set of every family)")
 ap.add_argument("--limit", type=int, help="first N subset articles (smoke tests)")
 ap.add_argument("--device")
-ap.add_argument("--allow-no-nrc", action="store_true", help="run without the NRC lexicon (no sentiment reliance)")
 ap.add_argument("--resume", action="store_true", help="reuse saved clean attributions and skip finished sets")
 ap.add_argument("--no-save-attributions", action="store_true")
 args = ap.parse_args()
 cfg = load_config(args.config)
 P, AC, ds, name = cfg["paths"], cfg["attribution"], args.dataset, args.detector
-
-nrc_path = Path(P["nrc_lexicon"])
-if nrc_path.exists():
-    nrc = A.load_nrc(nrc_path)
-elif args.allow_no_nrc:
-    nrc = None
-    log.warning("NRC lexicon not found at %s: sentiment reliance skipped (--allow-no-nrc)", nrc_path)
-else:
-    sys.exit(f"NRC lexicon not found at {nrc_path}. Download NRC-Emotion-Lexicon-Wordlevel-v0.92.txt (see README) "
-             "and put it there, or pass --allow-no-nrc to run without sentiment reliance.")
 
 det = load_detector(name, ds, cfg, args.device)
 rng = np.random.default_rng(0)
@@ -81,13 +68,6 @@ def read_attr(set_name: str) -> dict:
         return {r["id"]: r for r in map(json.loads, f)}
 
 
-def nrc_row(words, scores, prefix: str) -> dict:
-    if nrc is None:
-        return {}
-    r = A.cue_reliance(words, scores, A.nrc_mask(words, nrc), freq, rng)
-    return {f"{prefix}{k}": v for k, v in r.items()}
-
-
 # ---- clean
 clean_ig: dict = {}
 clean_file = out_dir / "clean.jsonl"
@@ -104,8 +84,7 @@ if len(clean_ig) < len(ids):
         clean_ig[i] = ig
         row = {"id": i, "label": int(y), "ig_convergence_delta": ig.get("convergence_delta"),
                "ig_rel_delta": ig.get("rel_delta"),
-               **{f"agree_{k}": v for k, v in A.stability(ig, alt, AC["topk"]).items()},
-               **nrc_row(ig["words"], ig["scores"], "nrc_")}
+               **{f"agree_{k}": v for k, v in A.stability(ig, alt, AC["topk"]).items()}}
         clean_rows.append(row)
         attr_rows.append({"id": i, "words": ig["words"], "ig": _pack(ig)["scores"], second: _pack(alt)["scores"],
                           "ig_rel_delta": ig.get("rel_delta")})
@@ -160,7 +139,6 @@ for attack in sets:
             rec.update(ctrl_words=ig_r["words"], ctrl_ig=_pack(ig_r)["scores"])
         mask = A.changed_word_mask(ig_c["words"], ig_a["words"])
         row.update({f"style_{kk}": v for kk, v in A.cue_reliance(ig_a["words"], ig_a["scores"], mask, freq, rng).items()})
-        row.update(nrc_row(ig_a["words"], ig_a["scores"], "nrc_adv_"))
         rows.append(row)
         attr_rows.append(rec)
     write_jsonl(rows, out_dir / f"{attack}.jsonl")

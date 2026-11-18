@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Full core study. Each step can be run on its own; steps 04-09 loop over datasets and detectors.
-# Usage: bash scripts/run_all.sh [config]      (GPU strongly recommended for steps 02, 04, 05, 08, 09)
+# Full pipeline behind the paper. Each step can be run on its own; steps 04-08 loop over datasets and detectors.
+# Usage: bash scripts/run_all.sh [config]      (GPU strongly recommended for steps 02, 04, 05, 08)
 #   GEN_BACKEND=hf bash scripts/run_all.sh      generate the sentiment family with transformers instead of vLLM
 # Step 02 skips datasets whose sentiment sets already exist, so the script can be rerun after an interruption.
 set -euo pipefail
@@ -29,12 +29,11 @@ done
 python scripts/06_stage1_behaviour.py --config "$CFG"
 python scripts/07_stage2_representation.py --config "$CFG"
 
+# Stage 3: the paper reports attributions for the encoders only
 for ds in $DATASETS; do
-  for det in $ENCODERS $LLMS; do
-    python scripts/08_stage3_attribution.py --config "$CFG" --dataset "$ds" --detector "$det"
-    python scripts/09_stage4_causal.py --config "$CFG" --dataset "$ds" --detector "$det"
+  for det in $ENCODERS; do
+    python scripts/08_stage3_attribution.py --config "$CFG" --dataset "$ds" --detector "$det" \
+      --sets publisher_A publisher_B
   done
 done
-
-python scripts/10_analysis.py --config "$CFG"
-echo "done: see results/analysis/"
+echo "done: results/ now holds the files in paper_data/results/ (see paper_data/README.md)"

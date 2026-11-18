@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from robustlens.attacks.validity import anchor_recall, fact_anchors, vasr
+from robustlens.attacks.validity import anchor_recall, fact_anchors
 from robustlens.data import Split, pair_sentiment, stratified_subset_ids
 from robustlens.detectors.base import aggregate_to_words, resolve_layers, tokens_to_words
 from robustlens.diagnosis import zone
@@ -115,18 +115,16 @@ def test_pair_sentiment_and_subset():
     assert len(sub) == 500 and sub.labels.sum() == 200
 
 
-def test_anchors_and_vasr():
+def test_anchors():
     a = fact_anchors("On 3 March 2020, Senator Jane Doe said taxes rose 12%. However, critics disagreed.")
     assert {"3", "march", "2020", "12%", "senator jane doe"} <= a and "however" not in a
     assert anchor_recall("Jane Doe paid 5 dollars.", "SHOCKING: Jane Doe paid 5 dollars!") == 1.0
-    r = vasr(np.array([1, 1, 0, 0]), np.array([1, 1, 0, 1]), np.array([0, 1, 1, 1]), np.array([True, True, True, False]), 0.8)
-    assert r["asr"] == pytest.approx(2 / 3) and r["vasr"] == pytest.approx(2 / 3 * 0.8)
 
 
 def test_cue_reliance_and_changed_words():
     words = ["the", "terrible", "senator", "said", "great", "things", "today", "here"]
     scores = np.array([0.0, 5.0, 0.1, 0.1, 5.0, 0.1, 0.1, 0.1])
-    mask = A.nrc_mask(words, {"terrible", "great"})
+    mask = np.array([w in {"terrible", "great"} for w in words])
     r = A.cue_reliance(words, scores, mask, {}, np.random.default_rng(0))
     assert r["share"] > 0.9 and r["reliance"] > 0.8
     changed = A.changed_word_mask(["the", "senator", "said"], ["SHOCKING", "the", "senator", "said"])
@@ -160,38 +158,6 @@ def test_save_states_keeps_large_values(tmp_path):
     assert np.isfinite(st[3]).all() and st[3][0, 0] == pytest.approx(1e5) and ids == ["x"]
 
 
-def test_permutation_keeps_detector_cells_together():
-    import pandas as pd
-    from robustlens.analysis import rq
-
-    rng = np.random.default_rng(0)
-    rows = []
-    for ds in ("d1", "d2"):
-        for u in range(12):
-            margin = rng.normal()
-            for fam in ("publisher", "sentiment"):
-                rows.append({"dataset": ds, "detector_base": f"m{u}", "family": fam, "clean_f1": 0.8 + 0.01 * rng.normal(),
-                             "conf_margin_clean": 0.3 + 0.01 * rng.normal(), "probe_margin_clean": margin,
-                             "f1_drop": 0.5 * margin + 0.05 * rng.normal()})
-    cells = pd.DataFrame(rows)
-    p_signal = rq.permutation_p(cells, rq.OUTPUT_ONLY, ["probe_margin_clean"], "f1_drop", "family", 199, 0)
-    assert p_signal < 0.05
-    cells["probe_margin_clean"] = rng.normal(size=len(cells))
-    cells["probe_margin_clean"] = cells.groupby(["dataset", "detector_base"])["probe_margin_clean"].transform("first")
-    p_noise = rq.permutation_p(cells, rq.OUTPUT_ONLY, ["probe_margin_clean"], "f1_drop", "family", 199, 0)
-    assert p_noise > 0.05
-
-
-def test_random_eraser_is_centred():
-    import torch
-    from robustlens.stages.causal import random_subspace_eraser
-
-    mu = np.full(8, 5.0, dtype=np.float32)
-    erase = random_subspace_eraser(8, 1, seed=0, mean=mu)
-    x = torch.tensor(mu).unsqueeze(0)
-    assert torch.allclose(erase(x), x, atol=1e-5)  # the concept mean is a fixed point, as with LEACE
-
-
 def _tiny(name):
     from robustlens.detectors.encoder import EncoderDetector
 
@@ -199,38 +165,6 @@ def _tiny(name):
         return EncoderDetector(name, max_len=32, device="cpu", batch_size=2)
     except Exception as e:  # no network and no cache
         pytest.skip(f"{name} unavailable: {e}")
-
-
-@pytest.mark.parametrize("name", ["sshleifer/tiny-gpt2", "google/bert_uncased_L-2_H-128_A-2"])
-def test_edit_target_matches_hidden_states(name):
-    import torch
-    from robustlens.stages.causal import edit_block_output
-
-    det = _tiny(name)
-    texts = ["The senator said taxes rose.", "A short one."]
-    enc = det.batch_inputs(texts)
-    with torch.no_grad():
-        hs = det.model(**enc, output_hidden_states=True).hidden_states
-    for layer in range(1, det.n_layers + 1):
-        seen = {}
-
-        def grab(h, seen=seen):
-            seen["h"] = h.detach().clone()
-            return h
-        with edit_block_output(det, layer, grab), torch.no_grad():
-            det.model(**enc)
-        assert torch.allclose(seen["h"], hs[layer], atol=1e-5), f"layer {layer}"
-
-
-def test_token_states_cover_all_positions():
-    from robustlens.stages.causal import token_states
-
-    det = _tiny("google/bert_uncased_L-2_H-128_A-2")
-    texts = ["one two three four five six", "seven eight"]
-    X, owner = token_states(det, texts, None, layer=1, per_text=100)
-    lengths = det.batch_inputs(texts)["attention_mask"].sum(1).tolist()
-    assert X.shape == (sum(lengths), det.model.config.hidden_size)
-    assert (owner == 0).sum() == lengths[0] and (owner == 1).sum() == lengths[1]
 
 
 def test_llm_prompt_finds_stripped_article():
@@ -246,26 +180,6 @@ def test_llm_prompt_finds_stripped_article():
     det.tokenizer, det.max_article_tokens, det.mapping_seed = Tok(), 10_000, 0
     prompt, (s, e), art = det.build_prompt("\n  Jane Doe said taxes rose.  \n", "id1")
     assert prompt[s:e] == art == "Jane Doe said taxes rose."
-
-
-def test_bundled_leace_matches_package():
-    import torch
-    from robustlens.stages import _leace
-
-    g = torch.Generator().manual_seed(0)
-    x = torch.randn(400, 16, generator=g)
-    z = (x[:, 0] + 0.5 * x[:, 3] + 0.3 * torch.randn(400, generator=g) > 0).long()
-    x[:, 5] += 3 * z  # a strong concept direction
-    mine = _leace.LeaceEraser.fit(x, z)
-    xe = mine(x)
-    # the erased features carry no linear information about z: class means coincide
-    assert torch.allclose(xe[z == 0].mean(0), xe[z == 1].mean(0), atol=1e-3)
-    try:
-        from concept_erasure import LeaceEraser
-    except ImportError:
-        return
-    ref = LeaceEraser.fit(x, z)
-    assert torch.allclose(ref(x), xe, atol=1e-4)
 
 
 def test_version_tuple():

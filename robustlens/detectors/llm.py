@@ -21,7 +21,7 @@ import numpy as np
 import torch
 
 from ..utils import hf_dtype_kwargs, stable_hash
-from .base import find_block_list, softmax_fake
+from .base import softmax_fake
 
 QUESTION = "Is the article above real or fake news?"
 
@@ -99,14 +99,6 @@ class ZeroShotLLMDetector:
             self._last_logits_kw = {key: 1} if key else {}
         return self._last_logits_kw
 
-    def forward_kwargs(self) -> dict:
-        return self.last_logits_kw
-
-    def batch_inputs(self, texts: Sequence[str], ids: Optional[Sequence[str]] = None) -> dict:
-        """Model inputs exactly as class_logits builds them (used for token-level states in Stage 4)."""
-        self._require_ids(texts, ids)
-        return self._encode_prompts([self.build_prompt(t, a)[0] for t, a in zip(texts, ids)])
-
     def _letters(self, last_logits: torch.Tensor) -> torch.Tensor:
         """[b, V] -> [b, 2] logits for (A, B), taking the best of each letter's token variants."""
         cols = [last_logits[:, self.letter_ids[L]].max(dim=1).values for L in ("A", "B")]
@@ -122,9 +114,6 @@ class ZeroShotLLMDetector:
     @property
     def n_layers(self) -> int:
         return int(self.model.config.num_hidden_layers)
-
-    def layer_modules(self) -> list[torch.nn.Module]:
-        return list(find_block_list(self.model, self.n_layers))
 
     def _require_ids(self, texts, ids):
         if ids is None:

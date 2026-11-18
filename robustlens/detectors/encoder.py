@@ -18,7 +18,7 @@ import torch.nn.functional as F
 
 from ..data import RELIABLE_STYLES, UNRELIABLE_STYLES, Split
 from ..utils import log, save_json, set_seed
-from .base import find_block_list, softmax_fake
+from .base import softmax_fake
 
 DECODER_TYPES = {"gpt2", "gpt_neo", "gptj", "llama", "mistral", "qwen2", "gpt_neox", "opt"}
 
@@ -52,17 +52,10 @@ class EncoderDetector:
     def n_layers(self) -> int:
         return int(self.model.config.num_hidden_layers)
 
-    def layer_modules(self) -> list[torch.nn.Module]:
-        return list(find_block_list(self.model, self.n_layers))
-
     def encode(self, texts: Sequence[str], max_len: Optional[int] = None) -> dict:
         enc = self.tokenizer(list(texts), truncation=True, max_length=max_len or self.max_len,
                              padding=True, return_tensors="pt")
         return {k: v.to(self.device) for k, v in enc.items() if k in ("input_ids", "attention_mask")}
-
-    def batch_inputs(self, texts: Sequence[str], ids: Optional[Sequence[str]] = None) -> dict:
-        """Model inputs exactly as class_logits builds them (used for token-level states in Stage 4)."""
-        return self.encode(texts)
 
     def readout_positions(self, attention_mask: torch.Tensor) -> torch.Tensor:
         """First token for encoders; last non-padding token for decoders (right padding)."""

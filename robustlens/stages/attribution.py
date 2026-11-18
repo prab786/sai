@@ -1,19 +1,18 @@
-"""Stage 3: which input cues does the decision rest on? (tiers T1-T2)
+"""Stage 3: which input cues does the decision rest on?
 
 Attributions explain the fake-vs-real margin (logit_fake - logit_real), so their sign means
 "pushes toward fake". Scores are aggregated from sub-word tokens to words of the article only
 (prompt tokens of LLM detectors are excluded).
 
-Explainers: Integrated Gradients (gradient, T2) and a second explainer for the agreement control:
+Explainers: Integrated Gradients and a second explainer for the agreement control:
 embedding occlusion (default, no extra dependency) or SHAP's partition explainer (``pip install shap``).
 
 Cue reliance = share of absolute attribution mass on cue words, minus the share on frequency-matched
-random words (control). Cues: NRC Emotion Lexicon words (sentiment) and words the rewrite changed (style).
+random words (control). The cue is the set of words the rewrite changed (style reliance).
 """
 from __future__ import annotations
 
 import difflib
-from pathlib import Path
 from typing import Optional, Sequence
 
 import numpy as np
@@ -151,18 +150,6 @@ def stability(a: dict, b: dict, k: int = 10) -> dict:
 
 
 # ---------------------------------------------------------------------- cue reliance
-def load_nrc(path: str | Path, emotions: Optional[set[str]] = None) -> set[str]:
-    """NRC Emotion Lexicon word-level file (word<TAB>emotion<TAB>0/1). Default cue = positive or negative words."""
-    emotions = emotions or {"positive", "negative"}
-    words = set()
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            parts = line.strip().split("\t")
-            if len(parts) == 3 and parts[1] in emotions and parts[2] == "1":
-                words.add(parts[0].lower())
-    return words
-
-
 def corpus_frequencies(texts: Sequence[str]) -> dict[str, int]:
     from collections import Counter
 
@@ -208,7 +195,3 @@ def cue_reliance(words: Sequence[str], scores: np.ndarray, cue_mask: np.ndarray,
     share = float(s[cue_mask].sum() / total)
     ctrl = float(np.mean(shares))
     return {"share": share, "control": ctrl, "reliance": share - ctrl, "n_cue": int(cue_mask.sum())}
-
-
-def nrc_mask(words: Sequence[str], lexicon: set[str]) -> np.ndarray:
-    return np.array([w.lower() in lexicon for w in words], dtype=bool)

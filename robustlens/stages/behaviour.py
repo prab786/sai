@@ -1,6 +1,6 @@
 """Stage 1: how does the output fail, and for which class?
 
-Everything here needs scores only (tier T1), or labels only for the per-class and flip measures (T0).
+Everything here needs only the detector scores and the labels.
 Probabilities are P(fake); label 0 = real, 1 = fake.
 """
 from __future__ import annotations

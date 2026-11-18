@@ -3,11 +3,9 @@
 
 paths:
   sheepdog_data: ../SheepDog-main/data       # folder with news_articles/, reframings/, adversarial_test/
-  adsent_data: ../AdSent-main/data           # optional: folder with reformed/ (Llama-3.1 sentiment sets)
   processed: data/processed                  # canonical JSONL written by scripts/01_prepare_data.py
   checkpoints: checkpoints
   results: results
-  nrc_lexicon: lexicons/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt
 
 datasets: [politifact, gossipcop, lun]
 
@@ -19,7 +17,7 @@ controls:
   sentiment: [sentiment_ctl]                 # opposite pairing, used as the non-adversarial control
 
 subset:
-  size: 500            # Stages 3-4 run on a class-stratified subset per dataset (PolitiFact keeps all 90)
+  size: 500            # Stage 3 runs on a class-stratified subset per dataset (PolitiFact keeps all 90)
   seed: 0
 
 encoders:
@@ -39,7 +37,7 @@ encoders:
     grad_accum: 1
     max_len: 256
     consistency_lambda: 1.0   # strategy C
-  # every stage (scores, states, attribution, erasure, patching) uses max_len, so all stages see the same input
+  # every stage (scores, states, attribution) uses max_len, so all stages see the same input
 
 llms:
   models:
@@ -63,7 +61,6 @@ validity:
   nli_threshold: 0.5          # mean entailment over chunks, required in both directions
   anchor_threshold: 0.8       # share of numbers, dates and named entities kept
   chunk_words: 200
-  audit_per_family: 100
 
 behaviour:
   ece_bins: 10
@@ -86,15 +83,6 @@ attribution:
   shap_evals: 256
   topk: 10
 
-causal:
-  erase_layer: two_thirds     # two_thirds | <int> | auto (= Stage 2 divergence depth; on the full run almost
-                              # always the first layer, so not recommended)
-  patch_layers: all
-
 diagnosis:
   s_cut: 0.9
   g_cut: 0.05
-  pr_cut: 0.5
-
-analysis:
-  permutations: 10000

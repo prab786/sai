@@ -1,11 +1,9 @@
 # Smoke test: whole pipeline on PolitiFact with tiny models (CPU). Paths as in configs/default.yaml.
 paths:
   sheepdog_data: ../SheepDog-main/data
-  adsent_data: ../AdSent-main/data
   processed: smoke/processed
   checkpoints: smoke/checkpoints
   results: smoke/results
-  nrc_lexicon: lexicons/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt
 datasets:
 - politifact
 families:
@@ -15,10 +13,10 @@ families:
   - publisher_C
   - publisher_D
   sentiment:
-  - sentiment_adsent_adv
+  - sentiment_adv
 controls:
   sentiment:
-  - sentiment_adsent_ctl
+  - sentiment_ctl
 subset:
   size: 500
   seed: 0
@@ -62,7 +60,6 @@ validity:
   nli_threshold: 0.5
   anchor_threshold: 0.8
   chunk_words: 200
-  audit_per_family: 100
 behaviour:
   ece_bins: 10
   bootstrap: 200
@@ -79,12 +76,6 @@ attribution:
   second_explainer: occlusion
   shap_evals: 256
   topk: 10
-causal:
-  erase_layer: auto
-  patch_layers: all
 diagnosis:
   s_cut: 0.9
   g_cut: 0.05
-  pr_cut: 0.5
-analysis:
-  permutations: 200

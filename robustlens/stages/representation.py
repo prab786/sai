@@ -1,4 +1,4 @@
-"""Stage 2: where in the network is usable separation lost? (tier T2)
+"""Stage 2: where in the network is usable separation lost?
 
 * Probe retention: a linear probe trained on clean training states, evaluated on clean and attacked test
   states; PR = (acc_adv - 0.5) / (acc_clean - 0.5). Control: the same probe trained on shuffled labels.
@@ -87,7 +87,7 @@ def divergence_depth(drift: dict[int, float], control_upper: dict[int, float]) -
 
     Descriptive only. On the full run this lands on the first layer for nearly every attack, including the
     non-adversarial sentiment control, because rewrites restructure the text while random edits keep word
-    positions; it is therefore not used to choose the erasure layer (see ``causal.erase_layer``).
+    positions; it is therefore reported but not used in the paper.
     """
     for l in sorted(drift):
         d, u = drift[l], control_upper.get(l, np.inf)
