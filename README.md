@@ -1,7 +1,6 @@
 # When Real News Looks Fake
 
-Code and data for *When Real News Looks Fake: LLM Style Attacks Can Reverse the Predictions of Fake News
-Detectors*.
+Code and data for *Fine-grained Analysis of Style Attacks for Fake News Detection*.
 
 * **`paper_data/`**: the results behind every number, table and figure, and a script that recomputes them in about
   a minute without a GPU. See [`paper_data/README.md`](paper_data/README.md).
@@ -53,11 +52,7 @@ Llama 3 and Gemma 2 are gated models and need `huggingface-cli login`.
 File names use `publisher_A`–`publisher_D` for the SheepDog test sets A–D and `sentiment_adv` / `sentiment_ctl` for
 the tone attack and its control pairing.
 
-### Smoke test (CPU)
 
-`bash tests/run_smoke.sh` runs every step on PolitiFact with tiny models (2-layer BERT, tiny random RoBERTa, GPT-2
-and Gemma-2, Qwen2.5-0.5B-Instruct on 20 articles). It checks the code paths, not the results. Unit tests:
-`pytest tests/test_units.py`.
 
 ## Implementation notes
 
